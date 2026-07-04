@@ -1,15 +1,23 @@
 name: Build ClickRTP
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Find and unzip the newest zip
+        run: |
+          NEWEST=$(ls -t *.zip 2>/dev/null | head -1)
+          if [ -z "$NEWEST" ]; then
+            echo "No .zip found in repo!"; ls -la; exit 1
+          fi
+          echo "Building newest zip: $NEWEST"
+          rm -rf _build
+          mkdir _build
+          unzip -o "$NEWEST" -d _build
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -19,11 +27,16 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn -B clean package
+        run: |
+          POM=$(find _build -name pom.xml | head -1)
+          DIR=$(dirname "$POM")
+          echo "Project dir: $DIR"
+          cd "$DIR"
+          mvn -B clean package
 
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
           name: ClickRTP
-          path: target/ClickRTP.jar
+          path: '_build/**/target/*.jar'
           if-no-files-found: error
